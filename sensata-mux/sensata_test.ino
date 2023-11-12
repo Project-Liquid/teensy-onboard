@@ -15,16 +15,16 @@ void setup() {
 
 void loop() {
   muxselect(0);
-  Serial.print("Sensor 0: ");
+  Serial.print("0, ");
   if (isConnected()) {
-    Serial.println(pressureCalc(readPressure()));
+    Serial.println(readPressure());
   } else {
     Serial.println("disconnected");
   }
   muxselect(1);
-  Serial.print("Sensor 1: ");
+  Serial.print("1, ");
   if (isConnected()) {
-    Serial.println(pressureCalc(readPressure()));
+    Serial.println(readPressure());
   } else {
     Serial.println("disconnected");
   }
@@ -68,13 +68,12 @@ int16_t readPressure() {
   return (int16_t)pressureOut;
 }
 
-long pressureCalc(int16_t digitalPressure)
+long _pressureCalc(int16_t digitalPressure)
 {
-  return digitalPressure / 32768.0;
+  return 2900 * (digitalPressure + 16384.0) / 32768.0;
 }
 
-long oldPressureCalc(int16_t digitalPressure)
+long pressureCalc(int16_t digitalPressure)
 {
   return (355 + (-7.16E-03 * digitalPressure) + (-1.84E-06 * (digitalPressure * digitalPressure)));
 }
-
