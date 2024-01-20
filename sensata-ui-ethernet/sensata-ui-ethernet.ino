@@ -103,6 +103,7 @@ static void receivePacket() {
 
   printf("[%u.%u.%u.%u][%d] ", remoteIP[0], remoteIP[1], remoteIP[2], remoteIP[3], size);
 
+  /*
   // Print each character
   for (int i = 0; i < size; i++) {
     uint8_t b = data[i];
@@ -115,4 +116,29 @@ static void receivePacket() {
     }
   }
   printf("\r\n");
+  */
+
+  // Parse each command, separated by semicolons
+  String cmd = "";
+  for (int i = 0; i < size; i++) {
+    uint8_t b = data[i];
+    if (b == 59) { // if semicolon, parse command up to this point
+      if(cmd.length() < 3) {
+        Serial.print("Command too short:");
+        Serial.println(cmd);
+      }
+      else {
+        // parseCommand(cmd);TODO
+      }
+      cmd = "";
+    } 
+    else { // if not semicolon, add 
+      if ((b < 32) || (b > 126)) { //if not in ASCII printable characters
+        Serial.print("Command includes illegal character:");
+        Serial.println(b);
+      } else {
+        cmd += char(b);
+      }
+    }
+  }
 }
