@@ -15,6 +15,16 @@ constexpr uint16_t kPort = 5190;  // Chat port
 
 EthernetUDP udp;
 
+// Initialize command list with maximum 20 commands in it -- what's a reasonable number?
+// Each command is max length 8 characters -- can we make use of that for memory?
+String commandBuffer[20];
+uint8_t numCommands = 0;
+
+// Keep track of if we're waiting, when we started, and how long we should wait
+bool waiting = false;
+unsigned long startTime;
+long duration;
+
 void setup() {
   Serial.begin(115200);
   while (!Serial && millis() < 4000) {
@@ -22,6 +32,7 @@ void setup() {
   }
   printf("Starting...\r\n");
 
+  // TODO put networking in a function
   // Get Teensy mac address
   uint8_t mac[6];
   Ethernet.macAddress(mac);  // This is informative; it retrieves, not sets
@@ -61,14 +72,79 @@ void setup() {
 }
 
 void loop() {
-  receivePacket();
+  // Check if new commands received
+  // If they are, insert them at the beginning of the buffer to be executed immediately
+  // Mainly useful for immediate abort
+  receivePacket();   
 
   if(foundLaptop) {
     printf("Sending message to [%u.%u.%u.%u:%d]\n", remoteIP[0], remoteIP[1], remoteIP[2], remoteIP[3], kPort);
     udpSend("HSK");
   }
 
-  delay(1000);
+  // Execute the first command in the buffer
+  // Unless the first command is PDW, SPK, etc and we are waiting
+  executeCommands();
+
+  delay(10); // TODO -- should we check for receiving packets less frequently than 100Hz?
+}
+
+void executeCommands()
+{
+  if (numCommands == 0) { 
+    return;
+  } 
+  
+  // Access and read the first command
+  String command = commandBuffer[0];  
+  String code = command.substring(0, 3);
+  String data = command.substring(4);
+  // compareTo returns 0 if strings match
+  // These are all the commands we want to execute immediately, even if we're in a wait period
+  if (code.compareTo("ABT") == 0) {
+    // abort 
+    // clear the buffer
+    removeFirstCommand();
+    return;
+  } else if (code.compareTo("CLR") == 0) {
+    // clear the buffer
+    removeFirstCommand();
+    return;
+  } else if (code.compareTo("TMP") == 0) {
+    // do temp stuff, i don't know
+    removeFirstCommand();
+    return;
+  } else if (code.compareTo("SEN") == 0) {
+    // do sensata stuff, i don't know
+    removeFirstCommand();
+    return;
+  }
+
+  // if bool waiting is true, check if waiting period is over
+  if (waiting) {
+    if (millis() - startTime >= duration) {
+      waiting = false;
+    } else {
+      return;
+    }
+  }
+
+  // These are all the commands we want to execute if we are not waiting
+  if (code.compareTo("PDW") == 0) {
+    // pin write
+  } else if (code.compareTo("SPK") == 0) {
+    // spark plug
+  } else if (code.compareTo("IDL") == 0) {
+    // idle
+  } else if (code.compareTo("WAI") == 0) { // wait for x centiseconds (up to 100 sec)
+    waitCentisec(data);
+  } else {
+      Serial.print("Command includes unrecognized command sequence:");
+      Serial.println(code);
+  }
+
+  removeFirstCommand();
+  return;
 }
 
 void udpSend(const String &message) {
@@ -103,42 +179,76 @@ static void receivePacket() {
 
   printf("[%u.%u.%u.%u][%d] ", remoteIP[0], remoteIP[1], remoteIP[2], remoteIP[3], size);
 
-  /*
-  // Print each character
-  for (int i = 0; i < size; i++) {
-    uint8_t b = data[i];
-    if (b < 0x20) {
-      printf("<%s>", kCtrlNames[b].c_str());
-    } else if (b < 0x7f) {
-      putchar(data[i]);
-    } else {
-      printf("<%02xh>", data[i]);
-    }
-  }
-  printf("\r\n");
-  */
+  // Hopefully this will work with strtok. If not -- const_cast<char*>(data_str.c_str()) or something? 
+  const char* data_str(reinterpret_cast<const char*>(data));
+  String newCommands[10];
 
-  // Parse each command, separated by semicolons
-  String cmd = "";
-  for (int i = 0; i < size; i++) {
-    uint8_t b = data[i];
-    if (b == 59) { // if semicolon, parse command up to this point
-      if(cmd.length() < 3) {
-        Serial.print("Command too short:");
-        Serial.println(cmd);
-      }
-      else {
-        // parseCommand(cmd);TODO
-      }
-      cmd = "";
-    } 
-    else { // if not semicolon, add 
-      if ((b < 32) || (b > 126)) { //if not in ASCII printable characters
-        Serial.print("Command includes illegal character:");
-        Serial.println(b);
-      } else {
-        cmd += char(b);
-      }
-    }
+  // Read and store each of the commands in sequence
+  char* command = strtok(data_str, ";");
+  size_t newCommandNum = 0;
+  for (; command != NULL && newCommandNum < 10; newCommandNum++) {
+    newCommands[newCommandNum] = command;
+    command = strtok(NULL, ";");
   }
+
+  // Shift existing commands back
+  for (size_t i = newCommandNum; i < 20; i++) {
+    commandBuffer[i + newCommandNum] = commandBuffer[i];
+  }
+  // Insert new commands into commandBuffer
+  for (size_t i = 0; i < newCommandNum; i++) {
+    commandBuffer[i] = newCommands[i];
+  }
+
+  numCommands += newCommandNum;
+}
+
+void removeFirstCommand() {
+  if (numCommands > 0) {
+    // Shift elements to remove the first command
+    for (size_t i = 0; i < numCommands; i++) {
+      commandBuffer[i] = commandBuffer[i + 1];
+    }
+    numCommands -= 1;
+  }
+}
+
+void pinDigitalWrite(String data) {  // PDW
+    if (data.length() < 3) {
+          Serial.print("Command data too short for PDW:");
+          Serial.println(data);
+    }
+
+    for (size_t pos = 0; pos < data.length(); pos += 3) {
+        String pin_name = data.substring(pos, pos+1);
+        int pin = pin_name.toInt();
+        char dataVal = data.charAt(pos+2);
+
+        // Serial.println(pin);
+        if ((pin < 0) || (pin > 8 )) { //TODO: probably put these somewhere better
+          Serial.print("Command includes out-of-bounds pin:");
+          Serial.println(pin);
+        }
+
+        // int pinNum = valvePins[pin]; // if we store valve pins on the Teensy
+        if (dataVal == '0') {
+            digitalWrite((uint8_t)pin, LOW);
+            Serial.print("Set pin "); Serial.print((uint8_t)pin);
+            Serial.println(" to LOW");
+        } else if (dataVal == '1') {
+            digitalWrite((uint8_t)pin, HIGH);
+            Serial.print("Set pin "); Serial.print((uint8_t)pin);
+            Serial.println(" to HIGH");
+        } else {
+            Serial.print("Command includes invalid write value:");
+            Serial.println(pin);
+        }
+    }
+}
+
+
+void waitCentisec(String data) {
+  duration = data.toInt() * 10;
+  startTime = millis();
+  waiting = true;
 }
