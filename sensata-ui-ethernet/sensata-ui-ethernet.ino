@@ -1,5 +1,8 @@
 #include <QNEthernet.h>
-#include <string.h>
+#include <string>
+#include <vector>
+#include <sstream>
+#include <algorithm>
 
 using namespace qindesign::network;
 
@@ -8,22 +11,17 @@ IPAddress teensyIP(169, 254, 44, 72);  // First three numbers should match lapto
 IPAddress gateway(169, 254, 44, 1);  // First three numbers should match laptop IP
 IPAddress subnet(255,255,0,0);  // Should map laptop subnet
 
-bool foundLaptop = false; // check if packet received from laptop
+// bool foundLaptop = false; // check if packet received from laptop
 IPAddress remoteIP(0, 0, 0, 0); // save laptop IP
 
 constexpr uint16_t kPort = 5190;  // Chat port
 
 EthernetUDP udp;
 
-// Initialize command list with maximum 20 commands in it -- what's a reasonable number?
-// Each command is max length 8 characters -- can we make use of that for memory?
-String commandBuffer[20];
-uint8_t numCommands = 0;
+// Command name, time of command execution
+std::vector<std::tuple<std::string, unsigned long>> commandSchedule;
 
-// Keep track of if we're waiting, when we started, and how long we should wait
-bool waiting = false;
-unsigned long startTime;
-long duration;
+// TODO error command 
 
 void setup() {
   Serial.begin(115200);
@@ -77,74 +75,64 @@ void loop() {
   // Mainly useful for immediate abort
   receivePacket();   
 
+  /*
   if(foundLaptop) {
     printf("Sending message to [%u.%u.%u.%u:%d]\n", remoteIP[0], remoteIP[1], remoteIP[2], remoteIP[3], kPort);
     udpSend("HSK");
-  }
+  } */
 
-  // Execute the first command in the buffer
-  // Unless the first command is PDW, SPK, etc and we are waiting
-  executeCommands();
+  // if it's time to execute any commands , execute them
+  executeScheduledCommands();
 
-  delay(10); // TODO -- should we check for receiving packets less frequently than 100Hz?
+  // delay(10); // TODO -- should we check for receiving packets less frequently than 100Hz?
 }
 
-void executeCommands()
+void executeScheduledCommands()
 {
-  if (numCommands == 0) { 
-    return;
-  } 
-  
+  commandSchedule.erase(std::remove_if(commandSchedule.begin(), commandSchedule.end(), [](std::tuple<std::string, unsigned long> tuple) {
+    unsigned long time = std::get<1>(tuple);
+    if(time <= millis()){
+      std::string command = std::get<0>(tuple);
+      parseCommand(command);
+      return 1;
+    } else {
+      return 0;
+    }
+  }), commandSchedule.end());  
+}
+
+void parseCommand(std::string command) { 
   // Access and read the first command
-  String command = commandBuffer[0];  
-  String code = command.substring(0, 3);
-  String data = command.substring(4);
+  std::string code = command.substr(0, 3);
+  std::string data = command.substr(3);
   // compareTo returns 0 if strings match
   // These are all the commands we want to execute immediately, even if we're in a wait period
-  if (code.compareTo("ABT") == 0) {
+  if (code == "ECH") {
+    echo(data);
+  } /* else if (code == "ABT") {
     // abort 
     // clear the buffer
-    removeFirstCommand();
-    return;
   } else if (code.compareTo("CLR") == 0) {
     // clear the buffer
-    removeFirstCommand();
-    return;
   } else if (code.compareTo("TMP") == 0) {
     // do temp stuff, i don't know
-    removeFirstCommand();
-    return;
   } else if (code.compareTo("SEN") == 0) {
     // do sensata stuff, i don't know
-    removeFirstCommand();
-    return;
-  }
-
-  // if bool waiting is true, check if waiting period is over
-  if (waiting) {
-    if (millis() - startTime >= duration) {
-      waiting = false;
-    } else {
-      return;
-    }
-  }
-
-  // These are all the commands we want to execute if we are not waiting
-  if (code.compareTo("PDW") == 0) {
-    // pin write
-  } else if (code.compareTo("SPK") == 0) {
+  } */ else if (code == "PDW") {
+    pinDigitalWrite(data);
+  } /* else if (code.compareTo("SPK") == 0) {
     // spark plug
   } else if (code.compareTo("IDL") == 0) {
     // idle
-  } else if (code.compareTo("WAI") == 0) { // wait for x centiseconds (up to 100 sec)
-    waitCentisec(data);
-  } else {
+  } */ else {
       Serial.print("Command includes unrecognized command sequence:");
-      Serial.println(code);
+      Serial.println(code.c_str());
   }
+}
 
-  removeFirstCommand();
-  return;
+void echo(std::string data)
+{
+  udpSend(data.c_str());
 }
 
 void udpSend(const String &message) {
@@ -170,67 +158,61 @@ static void receivePacket() {
   }
 
   // Get the packet data and set remote address
-  const uint8_t *data = udp.data();
+  const uint8_t *data = udp.data(); // TODO type
   remoteIP = udp.remoteIP();
-  if (!foundLaptop) {
-    udpSend("HSK");
-    foundLaptop = true;
-  }
 
-  printf("[%u.%u.%u.%u][%d] ", remoteIP[0], remoteIP[1], remoteIP[2], remoteIP[3], size);
-
-  // Hopefully this will work with strtok. If not -- const_cast<char*>(data_str.c_str()) or something? 
-  const char* data_str(reinterpret_cast<const char*>(data));
-  String newCommands[10];
-
-  // Read and store each of the commands in sequence
-  char* command = strtok(data_str, ";");
-  size_t newCommandNum = 0;
-  for (; command != NULL && newCommandNum < 10; newCommandNum++) {
-    newCommands[newCommandNum] = command;
-    command = strtok(NULL, ";");
-  }
-
-  // Shift existing commands back
-  for (size_t i = newCommandNum; i < 20; i++) {
-    commandBuffer[i + newCommandNum] = commandBuffer[i];
-  }
-  // Insert new commands into commandBuffer
-  for (size_t i = 0; i < newCommandNum; i++) {
-    commandBuffer[i] = newCommands[i];
-  }
-
-  numCommands += newCommandNum;
-}
-
-void removeFirstCommand() {
-  if (numCommands > 0) {
-    // Shift elements to remove the first command
-    for (size_t i = 0; i < numCommands; i++) {
-      commandBuffer[i] = commandBuffer[i + 1];
+  // Converting to stringstream
+  const char* data_char_array = reinterpret_cast<const char*>(data);
+  std::string data_str(data_char_array, std::min(strlen(data_char_array), static_cast<size_t>(size))); 
+  std::stringstream ss(data_str);
+  std::string command;
+  unsigned long executeTime = 0; 
+  while(std::getline(ss, command, ';')) {
+    // if command = wait, increase executeTime
+    std::string code = command.substr(0, 3);
+    if (code == "WAI") {
+      std::string message = command.substr(3);
+      unsigned long duration = std::stoul(message);
+      executeTime += duration * 10;
+    } else {
+      if(executeTime == 0) {
+        parseCommand(command);
+      } else {
+        std::tuple<std::string, unsigned long> commandTime(command, executeTime + millis());
+        commandSchedule.push_back(commandTime);
+      }
     }
-    numCommands -= 1;
   }
 }
 
-void pinDigitalWrite(String data) {  // PDW
-    if (data.length() < 3) {
-          Serial.print("Command data too short for PDW:");
-          Serial.println(data);
+
+void pinDigitalWrite(std::string data) {  // PDW
+    if (data.length() % 3 != 0 || data.length() == 0) {
+          Serial.print("Command data incorrect length for PDW:");
+          Serial.println(data.c_str());
+          return;
     }
 
     for (size_t pos = 0; pos < data.length(); pos += 3) {
-        String pin_name = data.substring(pos, pos+1);
-        int pin = pin_name.toInt();
-        char dataVal = data.charAt(pos+2);
+        std::string pin_name = data.substr(pos, pos+2);
+        for(char ch : pin_name) {
+            if (!std::isdigit(ch))
+            {
+              Serial.print("Command data incorrect type for PDW:");
+              Serial.println(data.c_str());
+              return;
+            }
+        }
+        int pin = stoi(pin_name);
+        char dataVal = data[pos+2];
 
         // Serial.println(pin);
-        if ((pin < 0) || (pin > 8 )) { //TODO: probably put these somewhere better
+        if (!( pin == 11 || (pin >= 15 && pin <= 20))) { // TODO change once we make list of valves-to-pins
           Serial.print("Command includes out-of-bounds pin:");
           Serial.println(pin);
+          return;
         }
 
-        // int pinNum = valvePins[pin]; // if we store valve pins on the Teensy
         if (dataVal == '0') {
             digitalWrite((uint8_t)pin, LOW);
             Serial.print("Set pin "); Serial.print((uint8_t)pin);
@@ -241,14 +223,7 @@ void pinDigitalWrite(String data) {  // PDW
             Serial.println(" to HIGH");
         } else {
             Serial.print("Command includes invalid write value:");
-            Serial.println(pin);
+            Serial.println(dataVal);
         }
     }
-}
-
-
-void waitCentisec(String data) {
-  duration = data.toInt() * 10;
-  startTime = millis();
-  waiting = true;
 }
