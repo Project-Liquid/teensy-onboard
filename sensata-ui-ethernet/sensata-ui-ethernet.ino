@@ -21,6 +21,22 @@ EthernetUDP udp;
 // Command name, time of command execution
 std::vector<std::tuple<std::string, unsigned long>> commandSchedule;
 
+// whether or not to transmit sensor data
+bool sensataStream = false;
+bool thermoStream = false;
+
+/* J17: Ethane Vent : V0
+J16: Upper Ethane : V1
+J15: Lower Ethane : V2
+J14: Nitrous Vent : V3
+J13: Upper Nitrous : V4
+J12: Lower Nitrous : V5 */
+int sparkPlugPin = 20;
+size_t numValves = 6;
+int valvePins[numValves] = {17, 16, 15, 14, 13, 12};
+int abortSeq[numValves] = {0, 0, 0, 1, 0, 0};
+int idleSeq[numValves] = {1, 1, 1, 0, 1, 1}; // this may not be right ... check with fluids
+
 // TODO error command 
 
 void setup() {
@@ -70,21 +86,16 @@ void setup() {
 }
 
 void loop() {
-  // Check if new commands received
-  // If they are, insert them at the beginning of the buffer to be executed immediately
-  // Mainly useful for immediate abort
+  // Check if new commands received and insert into buffer
+  // Execute immediately if necessary
   receivePacket();   
-
-  /*
-  if(foundLaptop) {
-    printf("Sending message to [%u.%u.%u.%u:%d]\n", remoteIP[0], remoteIP[1], remoteIP[2], remoteIP[3], kPort);
-    udpSend("HSK");
-  } */
 
   // if it's time to execute any commands , execute them
   executeScheduledCommands();
 
-  // delay(10); // TODO -- should we check for receiving packets less frequently than 100Hz?
+  readSensatas();
+
+  sendSensorValues();
 }
 
 void executeScheduledCommands()
@@ -105,40 +116,49 @@ void parseCommand(std::string command) {
   // Access and read the first command
   std::string code = command.substr(0, 3);
   std::string data = command.substr(3);
-  // compareTo returns 0 if strings match
   // These are all the commands we want to execute immediately, even if we're in a wait period
   if (code == "ECH") {
-    echo(data);
-  } /* else if (code == "ABT") {
-    // abort 
-    // clear the buffer
-  } else if (code.compareTo("CLR") == 0) {
-    // clear the buffer
-  } else if (code.compareTo("TMP") == 0) {
-    // do temp stuff, i don't know
-  } else if (code.compareTo("SEN") == 0) {
-    // do sensata stuff, i don't know
-  } */ else if (code == "PDW") {
+    udpSend(data.c_str());
+  } else if (code == "ABT") {
+    abort();
+    commandSchedule.clear();
+  } else if (code == "CLR") {
+    commandSchedule.clear();
+  } else if (code == "TMP") {
+    int start;
+    if(!stringToInt(data, 0, 1, start) || (start != 0 || start != 1))
+    {
+      Serial.print("TMP stream command not valid: ");
+      Serial.println(data.c_str());
+    } else {
+      thermoStream = start;
+    }
+  } else if (code == "SEN") {
+    int start;
+    if(!stringToInt(data, 0, 1, start) || (start != 0 || start != 1))
+    {
+      Serial.print("SEN stream command not valid: ");
+      Serial.println(data.c_str());
+    } else {
+      sensataStream = start;
+    }
+  } else if (code == "PDW") {
     pinDigitalWrite(data);
-  } /* else if (code.compareTo("SPK") == 0) {
-    // spark plug
-  } else if (code.compareTo("IDL") == 0) {
-    // idle
-  } */ else {
+  } else if (code == "SPK") {
+    int val;
+    if(!stringToInt(data, 0, 1, val) || (val != 0 || val != 1))
+    {
+      Serial.print("SPK on/off command not valid: ");
+      Serial.println(data.c_str());
+    } else {
+      digitalWrite(sparkPlugPin, val);    
+    }
+  } else if (code == "IDL") {
+    idle();
+  } else {
       Serial.print("Command includes unrecognized command sequence:");
       Serial.println(code.c_str());
   }
-}
-
-void echo(std::string data)
-{
-  udpSend(data.c_str());
-}
-
-void udpSend(const String &message) {
-  udp.beginPacket(remoteIP, kPort);
-  udp.print(message);
-  udp.endPacket();
 }
 
 // Control character names.
@@ -185,8 +205,18 @@ static void receivePacket() {
   }
 }
 
+bool stringToInt(const std::string& data, size_t start, size_t end, int& out){
+    for(size_t i = start; i < end; i++) {
+        if (!std::isdigit(data[i]))
+        {
+          return false;
+        }
+    }
+    out = stoi(data.substr(start, end));
+    return true;
+}
 
-void pinDigitalWrite(std::string data) {  // PDW
+void pinDigitalWrite(const std::string& data) {  // PDW
     if (data.length() % 3 != 0 || data.length() == 0) {
           Serial.print("Command data incorrect length for PDW:");
           Serial.println(data.c_str());
@@ -194,17 +224,18 @@ void pinDigitalWrite(std::string data) {  // PDW
     }
 
     for (size_t pos = 0; pos < data.length(); pos += 3) {
-        std::string pin_name = data.substr(pos, pos+2);
-        for(char ch : pin_name) {
-            if (!std::isdigit(ch))
-            {
-              Serial.print("Command data incorrect type for PDW:");
-              Serial.println(data.c_str());
-              return;
-            }
+        int pin;
+        int dataVal;
+        if (!stringToInt(data, pos, pos+2, pin)){
+          Serial.print("Invalid pin for PDW: ");
+          Serial.println(data.c_str());
+          return;
         }
-        int pin = stoi(pin_name);
-        char dataVal = data[pos+2];
+        if (!stringToInt(data, pos+2, pos+3, dataVal) || (dataVal != 0 || dataVal != 1)) {
+          Serial.print("Invalid pin high/low for PDW: ");
+          Serial.println(data.c_str());
+          return;
+        }
 
         // Serial.println(pin);
         if (!( pin == 11 || (pin >= 15 && pin <= 20))) { // TODO change once we make list of valves-to-pins
@@ -213,17 +244,55 @@ void pinDigitalWrite(std::string data) {  // PDW
           return;
         }
 
-        if (dataVal == '0') {
-            digitalWrite((uint8_t)pin, LOW);
-            Serial.print("Set pin "); Serial.print((uint8_t)pin);
-            Serial.println(" to LOW");
-        } else if (dataVal == '1') {
-            digitalWrite((uint8_t)pin, HIGH);
-            Serial.print("Set pin "); Serial.print((uint8_t)pin);
-            Serial.println(" to HIGH");
-        } else {
-            Serial.print("Command includes invalid write value:");
-            Serial.println(dataVal);
-        }
+        digitalWrite((uint8_t)pin, dataVal);
+        Serial.print("Set pin "); Serial.print((uint8_t)pin);
+        Serial.print(" to "); Serial.println(dataVal);
     }
+}
+
+void valveDigitalWrite(const std::string& data) {  // VDW
+    if (data.length() % 2 != 0 || data.length() == 0) {
+          Serial.print("Command data incorrect length for VDW:");
+          Serial.println(data.c_str());
+          return;
+    }
+
+    for (size_t pos = 0; pos < data.length(); pos += 2) {
+        int valve;
+        int dataVal;
+        if (!stringToInt(data, pos, pos+1, valve)){
+          Serial.print("Invalid valve for VDW: ");
+          Serial.println(data.c_str());
+          return;
+        }
+        if (!stringToInt(data, pos+1, pos+2, dataVal) || (dataVal != 0 || dataVal != 1)) {
+          Serial.print("Invalid valve high/low for PDW: ");
+          Serial.println(data.c_str());
+          return;
+        }
+
+        if (!(valve >= 0 && valve <=5)) { // 
+          Serial.print("Command includes out-of-bounds valve:");
+          Serial.println(valve);
+          return;
+        }
+
+        digitalWrite((uint8_t)valvePins[valve], dataVal);
+        Serial.print("Set valve "); Serial.print((uint8_t)valve);
+        Serial.print(" to "); Serial.println(dataVal);
+    }
+}
+
+void abort()
+{
+  for(size_t valve =0; valve < numValves; valve++) {
+    digitalWrite((uint8_t)valvePins[valve], abortSeq[valve]);
+  }
+}
+
+void idle()
+{
+  for(size_t valve =0; valve < numValves; valve++) {
+    digitalWrite((uint8_t)valvePins[valve], idleSeq[valve]);
+  }
 }
