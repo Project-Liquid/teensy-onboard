@@ -33,9 +33,9 @@ J13: Upper Nitrous : V4
 J12: Lower Nitrous : V5 */
 int sparkPlugPin = 20;
 size_t numValves = 6;
-int valvePins[numValves] = {17, 16, 15, 14, 13, 12};
-int abortSeq[numValves] = {0, 0, 0, 1, 0, 0};
-int idleSeq[numValves] = {1, 1, 1, 0, 1, 1}; // this may not be right ... check with fluids
+//int valvePins[numValves] = {17, 16, 15, 14, 13, 12};
+//int abortSeq[numValves] = {0, 0, 0, 1, 0, 0};
+//int idleSeq[numValves] = {1, 1, 1, 0, 1, 1}; // this may not be right ... check with fluids
 
 // TODO error command 
 
@@ -120,7 +120,7 @@ void parseCommand(std::string command) {
   if (code == "ECH") {
     udpSend(data.c_str());
   } else if (code == "ABT") {
-    abort();
+    //abort();
     commandSchedule.clear();
   } else if (code == "CLR") {
     commandSchedule.clear();
@@ -154,7 +154,7 @@ void parseCommand(std::string command) {
       digitalWrite(sparkPlugPin, val);    
     }
   } else if (code == "IDL") {
-    idle();
+    //idle();
   } else {
       Serial.print("Command includes unrecognized command sequence:");
       Serial.println(code.c_str());
@@ -250,6 +250,7 @@ void pinDigitalWrite(const std::string& data) {  // PDW
     }
 }
 
+/*
 void valveDigitalWrite(const std::string& data) {  // VDW
     if (data.length() % 2 != 0 || data.length() == 0) {
           Serial.print("Command data incorrect length for VDW:");
@@ -295,4 +296,4 @@ void idle()
   for(size_t valve =0; valve < numValves; valve++) {
     digitalWrite((uint8_t)valvePins[valve], idleSeq[valve]);
   }
-}
+} */
