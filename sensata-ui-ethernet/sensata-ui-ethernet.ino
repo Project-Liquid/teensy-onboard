@@ -96,6 +96,10 @@ void loop() {
   readSensatas();
 
   sendSensorValues();
+
+  Serial.println("Running loop");
+
+  delay(100);
 }
 
 void executeScheduledCommands()

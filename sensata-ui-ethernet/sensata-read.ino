@@ -18,9 +18,9 @@ unsigned long startTime, currentTime, elapsedTime;
 std::vector<std::tuple<std::string, int>> sensatas = {
   std::make_tuple("P0", 0),
   std::make_tuple("P1", 1), 
-  std::make_tuple("P2", 2), 
+/*  std::make_tuple("P2", 2), 
   std::make_tuple("P3", 3), 
-  std::make_tuple("P4", 4), 
+  std::make_tuple("P4", 4), */
 };
 
 std::vector<float> sensataReadings(sensatas.size());
