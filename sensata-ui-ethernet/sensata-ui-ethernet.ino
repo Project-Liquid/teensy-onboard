@@ -25,6 +25,8 @@ std::vector<std::tuple<std::string, unsigned long>> commandSchedule;
 bool sensataStream = false;
 bool thermoStream = false;
 
+//TODO: only send sensor values on intervals
+
 /* J17: Ethane Vent : V0
 J16: Upper Ethane : V1
 J15: Lower Ethane : V2
@@ -32,10 +34,10 @@ J14: Nitrous Vent : V3
 J13: Upper Nitrous : V4
 J12: Lower Nitrous : V5 */
 int sparkPlugPin = 20;
-size_t numValves = 6;
-//int valvePins[numValves] = {17, 16, 15, 14, 13, 12};
-//int abortSeq[numValves] = {0, 0, 0, 1, 0, 0};
-//int idleSeq[numValves] = {1, 1, 1, 0, 1, 1}; // this may not be right ... check with fluids
+const uint8_t numValves = 6;
+int valvePins[numValves] = {0, 1, 2, 17, 16, 15};
+int abortSeq[numValves] = {0, 0, 0, 1, 0, 0}; // todo confirm
+int idleSeq[numValves] = {1, 1, 1, 0, 1, 1}; // this may not be right ... check with fluids
 
 // TODO error command 
 
@@ -83,6 +85,8 @@ void setup() {
 
   // Start UDP server
   udp.begin(kPort);
+
+  sensataSetup();
 }
 
 void loop() {
@@ -95,11 +99,8 @@ void loop() {
 
   readSensatas();
 
+
   sendSensorValues();
-
-  Serial.println("Running loop");
-
-  delay(100);
 }
 
 void executeScheduledCommands()
@@ -124,13 +125,13 @@ void parseCommand(std::string command) {
   if (code == "ECH") {
     udpSend(data.c_str());
   } else if (code == "ABT") {
-    //abort();
+    abort();
     commandSchedule.clear();
   } else if (code == "CLR") {
     commandSchedule.clear();
   } else if (code == "TMP") {
     int start;
-    if(!stringToInt(data, 0, 1, start) || (start != 0 || start != 1))
+    if(!stringToInt(data, 0, 1, start) || (start != 0 && start != 1))
     {
       Serial.print("TMP stream command not valid: ");
       Serial.println(data.c_str());
@@ -139,7 +140,7 @@ void parseCommand(std::string command) {
     }
   } else if (code == "SEN") {
     int start;
-    if(!stringToInt(data, 0, 1, start) || (start != 0 || start != 1))
+    if(!stringToInt(data, 0, 1, start) || (start != 0 && start != 1))
     {
       Serial.print("SEN stream command not valid: ");
       Serial.println(data.c_str());
@@ -148,9 +149,11 @@ void parseCommand(std::string command) {
     }
   } else if (code == "PDW") {
     pinDigitalWrite(data);
+  } else if (code == "VDW") {
+    valveDigitalWrite(data);
   } else if (code == "SPK") {
     int val;
-    if(!stringToInt(data, 0, 1, val) || (val != 0 || val != 1))
+    if(!stringToInt(data, 0, 1, val) || (val != 0 && val != 1))
     {
       Serial.print("SPK on/off command not valid: ");
       Serial.println(data.c_str());
@@ -158,21 +161,13 @@ void parseCommand(std::string command) {
       digitalWrite(sparkPlugPin, val);    
     }
   } else if (code == "IDL") {
-    //idle();
+    idle();
+    commandSchedule.clear();
   } else {
       Serial.print("Command includes unrecognized command sequence:");
       Serial.println(code.c_str());
   }
 }
-
-// Control character names.
-static const String kCtrlNames[]{
-  "NUL", "SOH", "STX", "ETX", "EOT", "ENQ", "ACK", "BEL",
-  "BS",  "HT",  "LF",  "VT",  "FF",  "CR",  "SO",  "SI",
-  "DLE", "DC1", "DC2", "DC3", "DC4", "NAK", "SYN", "ETB",
-  "CAN", "EM",  "SUB", "ESC", "FS",  "GS",  "RS",  "US",
-};
-
 
 // Receives and prints chat packets
 static void receivePacket() {
@@ -235,7 +230,7 @@ void pinDigitalWrite(const std::string& data) {  // PDW
           Serial.println(data.c_str());
           return;
         }
-        if (!stringToInt(data, pos+2, pos+3, dataVal) || (dataVal != 0 || dataVal != 1)) {
+        if (!stringToInt(data, pos+2, pos+3, dataVal) || (dataVal != 0 && dataVal != 1)) {
           Serial.print("Invalid pin high/low for PDW: ");
           Serial.println(data.c_str());
           return;
@@ -254,7 +249,6 @@ void pinDigitalWrite(const std::string& data) {  // PDW
     }
 }
 
-/*
 void valveDigitalWrite(const std::string& data) {  // VDW
     if (data.length() % 2 != 0 || data.length() == 0) {
           Serial.print("Command data incorrect length for VDW:");
@@ -270,7 +264,7 @@ void valveDigitalWrite(const std::string& data) {  // VDW
           Serial.println(data.c_str());
           return;
         }
-        if (!stringToInt(data, pos+1, pos+2, dataVal) || (dataVal != 0 || dataVal != 1)) {
+        if (!stringToInt(data, pos+1, pos+2, dataVal) || (dataVal != 0 && dataVal != 1)) {
           Serial.print("Invalid valve high/low for PDW: ");
           Serial.println(data.c_str());
           return;
@@ -300,4 +294,4 @@ void idle()
   for(size_t valve =0; valve < numValves; valve++) {
     digitalWrite((uint8_t)valvePins[valve], idleSeq[valve]);
   }
-} */
+} 

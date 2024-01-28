@@ -8,5 +8,5 @@ void sendSensorValues(){
   std::string message = "";
   if (sensataStream) {sensataToString(message); }
   // todo thermocoupleToString(message); 
-  udpSend(message);
+  if (sensataStream || thermoStream) {udpSend(message);}
 }
