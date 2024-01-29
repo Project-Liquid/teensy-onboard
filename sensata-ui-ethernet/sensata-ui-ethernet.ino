@@ -27,6 +27,8 @@ bool thermoStream = false;
 
 //TODO: only send sensor values on intervals
 
+// TODO repeat back commands
+
 /* J17: Ethane Vent : V0
 J16: Upper Ethane : V1
 J15: Lower Ethane : V2
@@ -40,6 +42,7 @@ int abortSeq[numValves] = {0, 0, 0, 1, 0, 0}; // todo confirm
 int idleSeq[numValves] = {1, 1, 1, 0, 1, 1}; // this may not be right ... check with fluids
 
 // TODO error command 
+
 
 void setup() {
   Serial.begin(115200);
@@ -87,6 +90,11 @@ void setup() {
   udp.begin(kPort);
 
   sensataSetup();
+
+  for(size_t i = 0; i < numValves; i++)
+  {
+    pinMode(valvePins[i], OUTPUT);
+  }
 }
 
 void loop() {
