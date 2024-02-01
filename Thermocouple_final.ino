@@ -1,7 +1,14 @@
 #include <iostream>
 #include <vector>
+#include <tuple>
 
-std::vector<std::tuple<std::string, float>> thermocoupleVoltage;
+std::vector<std::tuple<std::string, int>> thermocouples = {
+  std::make_tuple("T0", A7),
+  std::make_tuple("T1", A8), 
+  std::make_tuple("T2", A9), 
+};
+
+std::vector<float> thermocoupleReadings(thermocouples.size());
 
 float voltToTemp(float v)
 {
@@ -16,39 +23,26 @@ float analogToTemperature(int input)
   return temperature;
 }
 
-void thermocoupleToString(std::string message)
-{
-  for(size_t i = 0; i < thermocoupleVoltage.size(); i++) {
-    float temperature = thermocoupleVoltage[i];
-    // std::tuple<std::string, float> currentThermocoupleTuple = thermocoupleVoltage[i];
-    // std::string name = std::get<0>(currentThermocoupleTuple);
-    // float temperature = std::get<1>(currentThermocoupleTuple);
-    message += std::to_string(temperature);
-    return message;
+void readThermocouples(){
+    for(size_t i = 0; i < thermocouples.size(); i++) {
+      std::tuple<std::string, int> thermocouple = thermocouples[i];
+      uint8_t readPin = std::get<1>(thermocouple);
+
+    float analogReading = (float) analogRead(readPin);
+    float temperature = analogToTemperature(analogReading);
+    thermocoupleReadings[i] = temperature;
   }
 }
 
+void thermocoupleToString(std::string& message)
+{
+  for(size_t i = 0; i < thermocoupleReadings.size(); i++) {
+    std::tuple<std::string, int> thermocouple = thermocouples[i];
+    std::string name = std::get<0>(thermocouple);
 
-
-void setup() {
-  // put your setup code here, to run once:
-  Serial.begin(9600);
+    char buffer[20];
+    sprintf(buffer, "%.2f", thermocoupleReadings[i]);
+    message += name;
+    message += buffer;
+  }
 }
-
-void loop() {
-  // put your main code here, to run repeatedly:
-	
-
-	thermocoupleVoltage.push_emplace_back(std::tuple<std::string "T0", analogToTemperature((float) analogRead(A7)));
-	thermocoupleVoltage.push_back(std::tuple<std::string "T1", analogToTemperature((float) analogRead(A8)));
-	thermocoupleVoltage.push_back(std::tuple<std::string "T2", analogToTemperature((float) analogRead(A9)));
-  
-  std::string new_message;
-  std::string new_new_message = thermocoupleToString(new_message);
-  Serial.println(analogRead(A8));
-  Serial.println( analogToTemperature((float) analogRead(A8)));
-  //thermocoupleVoltage.clear();
-  //new_message = "";
-
-}
-
