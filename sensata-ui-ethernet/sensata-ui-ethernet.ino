@@ -25,9 +25,7 @@ std::vector<std::tuple<std::string, unsigned long>> commandSchedule;
 bool sensataStream = false;
 bool thermoStream = false;
 
-//TODO: only send sensor values on intervals
-
-// TODO repeat back commands
+//TODO: maybe only send sensor values on intervals
 
 /* J17: Ethane Vent : V0
 J16: Upper Ethane : V1
@@ -46,8 +44,7 @@ void setup() {
   while (!Serial && millis() < 4000) {
     // Wait for Serial
   }
-  printf("Starting...\r\n");
-
+  
   // TODO put networking in a function
   // Get Teensy mac address
   uint8_t mac[6];
@@ -122,6 +119,8 @@ void executeScheduledCommands()
 }
 
 void parseCommand(std::string command) { 
+  // Let laptop know that we're executing a command
+  udpSend(command);
   // Access and read the first command
   std::string code = command.substr(0, 3);
   std::string data = command.substr(3);
