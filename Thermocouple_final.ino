@@ -1,8 +1,7 @@
 #include <iostream>
 #include <vector>
 
-
-
+std::vector<std::tuple<std::string, float>> thermocoupleVoltage;
 
 float voltToTemp(float v)
 {
@@ -12,17 +11,20 @@ float voltToTemp(float v)
 
 float analogToTemperature(int input)
 {
-	float voltage = ((0.003225) * input) / 47;
+	float voltage = 1000 * (((0.003225) * input) / 47);
 	float temperature = voltToTemp(voltage);
+  return temperature;
 }
 
-void thermocoupleToString(std::string& message)
+void thermocoupleToString(std::string message)
 {
   for(size_t i = 0; i < thermocoupleVoltage.size(); i++) {
-    std::tuple<std::string, float> currentThermocoupleTuple = thermocoupleVoltage[i];
-    std::string name = std::get<0>(currentThermocoupleTuple);
-    float temperature = std::get<1>(currentThermocoupleTuple);
-    message += (name + std::to_string(temperature));
+    float temperature = thermocoupleVoltage[i];
+    // std::tuple<std::string, float> currentThermocoupleTuple = thermocoupleVoltage[i];
+    // std::string name = std::get<0>(currentThermocoupleTuple);
+    // float temperature = std::get<1>(currentThermocoupleTuple);
+    message += std::to_string(temperature);
+    return message;
   }
 }
 
@@ -35,16 +37,18 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-	std::vector<std::tuple<std::string, float>> thermocoupleVoltage;
+	
 
 	thermocoupleVoltage.push_emplace_back(std::tuple<std::string "T0", analogToTemperature((float) analogRead(A7)));
 	thermocoupleVoltage.push_back(std::tuple<std::string "T1", analogToTemperature((float) analogRead(A8)));
 	thermocoupleVoltage.push_back(std::tuple<std::string "T2", analogToTemperature((float) analogRead(A9)));
   
   std::string new_message;
-  thermocoupleToString(new_message);
-  Serial.println(new_message);
-  thermocoupleVoltage.clear();
-  new_message = "";
+  std::string new_new_message = thermocoupleToString(new_message);
+  Serial.println(analogRead(A8));
+  Serial.println( analogToTemperature((float) analogRead(A8)));
+  //thermocoupleVoltage.clear();
+  //new_message = "";
 
 }
+
