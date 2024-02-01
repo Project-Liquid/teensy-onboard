@@ -65,7 +65,7 @@ void udpSend(const std::string &message) {
 
 void sendSensorValues() {
     std::string message = "";
-    if (sensataStream) { sensataToString(message); }
-    if (thermoStream) { thermocoupleToString(message); }
-    if (sensataStream || thermoStream) { udpSend(message); }
+    if (sensataStream) sensataToString(message);
+    if (thermoStream) thermocoupleToString(message);
+    if (sensataStream || thermoStream) udpSend(message);
 }

@@ -22,8 +22,8 @@ int sparkPlugPin         = 20;
 const uint8_t numValves  = 6;
 int valvePins[numValves] = {0, 1, 2, 17, 16, 15};
 int abortSeq[numValves]  = {0, 0, 0, 1, 0, 0};  // todo confirm
-int idleSeq[numValves]   = {1, 1, 1, 0,
-                            1, 1};  // this may not be right ... check with fluids
+// this may not be right ... check with fluids
+int idleSeq[numValves]   = {1, 1, 1, 0, 1, 1};
 
 void setup() {
     Serial.begin(115200);
@@ -31,12 +31,11 @@ void setup() {
         // Wait for Serial
     }
 
-    // TODO put networking in a function
     udpSetup();
 
     sensataSetup();
 
-    for (size_t i = 0; i < numValves; i++) { pinMode(valvePins[i], OUTPUT); }
+    for (size_t i = 0; i < numValves; i++) pinMode(valvePins[i], OUTPUT);
 }
 
 void loop() {
@@ -73,7 +72,9 @@ void executeScheduledCommands() {
 
 void parseCommand(std::string command) {
     // Let laptop know that we're executing a command
-    udpSend(command);
+    udpSend(command);  // TODO: only repeat back command AFTER it has been
+                       // executed without error! This way the GUI can update to
+                       // reflect the known state of the onboard computer
     // Access and read the first command
     std::string code = command.substr(0, 3);
     std::string data = command.substr(3);
@@ -217,7 +218,7 @@ void valveDigitalWrite(const std::string &data) {  // VDW
             return;
         }
 
-        if (!(valve >= 0 && valve <= 5)) {  //
+        if (!(valve >= 0 && valve <= 5)) {
             error(
                 "Command includes out-of-bounds valve: " + std::to_string(valve)
             );

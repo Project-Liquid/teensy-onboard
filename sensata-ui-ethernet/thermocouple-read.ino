@@ -28,8 +28,8 @@ float analogToTemperature(int input) {
 void readThermocouples() {
     for (size_t i = 0; i < thermocouples.size(); i++) {
         std::tuple<std::string, int> thermocouple = thermocouples[i];
-        uint8_t readPin                           = std::get<1>(thermocouple);
 
+        uint8_t readPin         = std::get<1>(thermocouple);
         float analogReading     = (float)analogRead(readPin);
         float temperature       = analogToTemperature(analogReading);
         thermocoupleReadings[i] = temperature;
@@ -39,8 +39,8 @@ void readThermocouples() {
 void thermocoupleToString(std::string &message) {
     for (size_t i = 0; i < thermocoupleReadings.size(); i++) {
         std::tuple<std::string, int> thermocouple = thermocouples[i];
-        std::string name                          = std::get<0>(thermocouple);
 
+        std::string name = std::get<0>(thermocouple);
         char buffer[20];
         sprintf(buffer, "%.2f", thermocoupleReadings[i]);
         message += name;

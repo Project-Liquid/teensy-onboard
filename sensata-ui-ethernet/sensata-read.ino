@@ -40,8 +40,8 @@ float convertToPSI(int16_t digitalPressure) {
 void readSensatas() {
     for (size_t i = 0; i < sensatas.size(); i++) {
         std::tuple<std::string, int> sensata = sensatas[i];
-        int muxPort                          = std::get<1>(sensata);
 
+        int muxPort = std::get<1>(sensata);
         pcaselect(muxPort);
         int16_t rawPressure = sensataInterface.readDSP_S();
         float psi           = convertToPSI(rawPressure);
@@ -52,8 +52,8 @@ void readSensatas() {
 void sensataToString(std::string &message) {
     for (size_t i = 0; i < sensataReadings.size(); i++) {
         std::tuple<std::string, int> sensata = sensatas[i];
-        std::string name                     = std::get<0>(sensata);
 
+        std::string name = std::get<0>(sensata);
         char buffer[20];
         sprintf(buffer, "%.2f", sensataReadings[i]);
         message += name;
