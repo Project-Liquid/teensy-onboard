@@ -1,5 +1,4 @@
 #include <iostream>
-#include <tuple>
 #include <vector>
 
 std::vector<std::tuple<std::string, int>> thermocouples = {

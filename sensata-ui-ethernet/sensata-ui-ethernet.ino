@@ -2,6 +2,8 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <tuple>
+#include "udp.h"
 
 // Command name, time of command execution
 std::vector<std::tuple<std::string, unsigned long>> commandSchedule;
@@ -71,28 +73,28 @@ void executeScheduledCommands() {
 }
 
 void parseCommand(std::string command) {
-    // Let laptop know that we're executing a command
-    udpSend(command);  // TODO: only repeat back command AFTER it has been
-                       // executed without error! This way the GUI can update to
-                       // reflect the known state of the onboard computer
     // Access and read the first command
     std::string code = command.substr(0, 3);
     std::string data = command.substr(3);
     // These are all the commands we want to execute immediately, even if we're
     // in a wait period
+    bool success = false;
     if (code == "ECH") {
         udpSend(data);
+        success = true;
     } else if (code == "ABT") {
-        abort();
+        success = executeAbort();
         commandSchedule.clear();
     } else if (code == "CLR") {
         commandSchedule.clear();
+        success = true;
     } else if (code == "TMP") {
         int start;
         if (!stringToInt(data, 0, 1, start) || (start != 0 && start != 1)) {
             error("TMP stream command not valid: " + data);
         } else {
             thermoStream = start;
+            success = true;
         }
     } else if (code == "SEN") {
         int start;
@@ -100,24 +102,32 @@ void parseCommand(std::string command) {
             error("SEN stream command not valid: " + data);
         } else {
             sensataStream = start;
+            success = true;
         }
     } else if (code == "PDW") {
-        pinDigitalWrite(data);
+        success = pinDigitalWrite(data);
     } else if (code == "VDW") {
-        valveDigitalWrite(data);
+        success = valveDigitalWrite(data);
     } else if (code == "SPK") {
         int val;
         if (!stringToInt(data, 0, 1, val) || (val != 0 && val != 1)) {
             error("SPK on/off command not valid: " + data);
         } else {
             digitalWrite(sparkPlugPin, val);
+            success = true;
         }
     } else if (code == "IDL") {
-        idle();
+        success = idle();
         commandSchedule.clear();
     } else {
         error("Command includes unrecognized command sequence: " + code);
+        success = false;
     }
+
+    // Let laptop know that we're executing a command if it executed without error
+    if (success) {
+        udpSend(command); 
+    } 
 }
 
 // Receives and prints chat packets
@@ -166,10 +176,11 @@ bool stringToInt(const std::string &data, size_t start, size_t end, int &out) {
     return true;
 }
 
-void pinDigitalWrite(const std::string &data) {  // PDW
+bool pinDigitalWrite(const std::string &data) {  // TODO: maybe check that all commands are valid BEFORE executing. 
+  // right now, executes all commands up until the first invalid one 
     if (data.length() % 3 != 0 || data.length() == 0) {
         error("Command data incorrect length for PDW: " + data);
-        return;
+        return false;
     }
 
     for (size_t pos = 0; pos < data.length(); pos += 3) {
@@ -177,18 +188,18 @@ void pinDigitalWrite(const std::string &data) {  // PDW
         int dataVal;
         if (!stringToInt(data, pos, pos + 2, pin)) {
             error("Invalid pin for PDW: " + data);
-            return;
+            return false;
         }
         if (!stringToInt(data, pos + 2, pos + 3, dataVal) ||
             (dataVal != 0 && dataVal != 1)) {
             error("Invalid pin high/low for PDW: " + data);
-            return;
+            return false;
         }
 
         // Serial.println(pin);
         if (!inArray(pin, valvePins, numValves)) {
             error("Command includes out-of-bounds pin: " + std::to_string(pin));
-            return;
+            return false;
         }
 
         digitalWrite((uint8_t)pin, dataVal);
@@ -197,12 +208,14 @@ void pinDigitalWrite(const std::string &data) {  // PDW
         Serial.print(" to ");
         Serial.println(dataVal);
     }
+    
+    return true;
 }
 
-void valveDigitalWrite(const std::string &data) {  // VDW
+bool valveDigitalWrite(const std::string &data) {  // VDW
     if (data.length() % 2 != 0 || data.length() == 0) {
         error("Command data incorrect length for VDW: " + data);
-        return;
+        return false;
     }
 
     for (size_t pos = 0; pos < data.length(); pos += 2) {
@@ -210,19 +223,19 @@ void valveDigitalWrite(const std::string &data) {  // VDW
         int dataVal;
         if (!stringToInt(data, pos, pos + 1, valve)) {
             error("Invalid valve for VDW: " + data);
-            return;
+            return false;
         }
         if (!stringToInt(data, pos + 1, pos + 2, dataVal) ||
             (dataVal != 0 && dataVal != 1)) {
             error("Invalid valve high/low for PDW: " + data);
-            return;
+            return false;
         }
 
         if (!(valve >= 0 && valve <= 5)) {
             error(
                 "Command includes out-of-bounds valve: " + std::to_string(valve)
             );
-            return;
+            return false;
         }
 
         digitalWrite((uint8_t)valvePins[valve], dataVal);
@@ -231,18 +244,21 @@ void valveDigitalWrite(const std::string &data) {  // VDW
         Serial.print(" to ");
         Serial.println(dataVal);
     }
+    return true;
 }
 
-void abort() {
+bool executeAbort() {
     for (size_t valve = 0; valve < numValves; valve++) {
         digitalWrite((uint8_t)valvePins[valve], abortSeq[valve]);
     }
+    return true;
 }
 
-void idle() {
+bool idle() {
     for (size_t valve = 0; valve < numValves; valve++) {
         digitalWrite((uint8_t)valvePins[valve], idleSeq[valve]);
     }
+    return true;
 }
 
 bool inArray(int element, const int *array, size_t arraySize) {
