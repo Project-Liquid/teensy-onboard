@@ -14,18 +14,17 @@ bool thermoStream = false;
 
 // TODO: maybe only send sensor values on intervals
 
+// all normally closed except ethane vent
 /* V0 : Nitrous run
-V1 : Nitrous vent
+V1 : Nitrous vent //normally closed
 V2 : Nitrous tank
 V3 : Ethane run
-V4 : Ethane vent
+V4 : Ethane vent // normally open
 V5 : Ethane tank 
 */
 int sparkPlugPin = 20;
 const uint8_t numValves = 6;
 int valvePins[numValves] = {0, 1, 2, 17, 16, 15};
-int abortSeq[numValves] = {0, 1, 0, 0, 0, 0};
-int idleSeq[numValves] = {0, 0, 0, 0, 1, 0};
 
 void setup()
 {
@@ -95,11 +94,6 @@ void parseCommand(std::string command)
         udpSend(data);
         success = true;
     }
-    else if (code == "ABT")
-    {
-        success = executeAbort();
-        commandSchedule.clear();
-    }
     else if (code == "CLR")
     {
         commandSchedule.clear();
@@ -152,11 +146,6 @@ void parseCommand(std::string command)
             digitalWrite(sparkPlugPin, val);
             success = true;
         }
-    }
-    else if (code == "IDL")
-    {
-        success = idle();
-        commandSchedule.clear();
     }
     else
     {
@@ -333,24 +322,6 @@ bool valveDigitalWrite(const std::string &data)
         Serial.println(dataVal);
     }
 
-    return true;
-}
-
-bool executeAbort()
-{
-    for (size_t valve = 0; valve < numValves; valve++)
-    {
-        digitalWrite((uint8_t)valvePins[valve], abortSeq[valve]);
-    }
-    return true;
-}
-
-bool idle()
-{
-    for (size_t valve = 0; valve < numValves; valve++)
-    {
-        digitalWrite((uint8_t)valvePins[valve], idleSeq[valve]);
-    }
     return true;
 }
 
