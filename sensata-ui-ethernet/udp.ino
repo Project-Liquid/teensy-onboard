@@ -33,14 +33,16 @@ void udpSetup()
     IPAddress ip = Ethernet.localIP();
     printf("    Local IP     = %u.%u.%u.%u\r\n", ip[0], ip[1], ip[2], ip[3]);
 
-    if (!Ethernet.waitForLink(15000))
-    {
-        printf("Failed to get link \r\n");
-        return;
-    }
-    else
-    {
-        printf("link established \r\n");
+    while(1) {
+      if (!Ethernet.waitForLink(500))
+      {
+          printf("Failed to get link. Retrying ... \r\n");
+      }
+      else
+      {
+          printf("Link established \r\n");
+          break;
+      }
     }
 
     // Start UDP server
