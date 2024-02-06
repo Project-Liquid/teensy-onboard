@@ -25,6 +25,7 @@ V5 : Ethane tank
 int sparkPlugPin = 20;
 const uint8_t numValves = 6;
 int valvePins[numValves] = {0, 1, 2, 17, 16, 15};
+int timeoutState[numValves] = {0, 0, 0, 0, 1, 0};
 
 void setup()
 {
@@ -50,6 +51,13 @@ void loop()
     // Check if new commands received and insert into buffer
     // Execute immediately if necessary
     receivePacket();
+
+    if(foundLaptop) {
+      if((millis() - lastPacketTime > heartbeatTimeout) && !timedOut) {
+        lostConnectionSequence();
+        timedOut = true;
+      }
+    }
 
     // if it's time to execute any commands , execute them
     executeScheduledCommands();
@@ -147,6 +155,10 @@ void parseCommand(std::string command)
             success = true;
         }
     }
+    else if (code == "TIM") 
+    {
+      success = goToTimeoutState();
+    }
     else
     {
         error("Command includes unrecognized command sequence: " + code);
@@ -172,6 +184,8 @@ static void receivePacket()
     // Get the packet data and set remote address
     const uint8_t *data = udp.data();
     remoteIP = udp.remoteIP();
+    foundLaptop = true;
+    lastPacketTime = millis();
 
     // Converting to stringstream
     const char *data_char_array = reinterpret_cast<const char *>(data);
@@ -323,6 +337,34 @@ bool valveDigitalWrite(const std::string &data)
     }
 
     return true;
+}
+
+void lostConnectionSequence() {
+  // if no commands, immediately go to timeout state
+  if (commandSchedule.empty()) {
+    goToTimeoutState();
+    return;
+  }
+
+  // otherwise, identify time of last scheduled command
+  unsigned long lastTime = millis();
+  for (const auto &command : commandSchedule) {
+    unsigned long time = std::get<1>(command);
+    if (time > lastTime) { 
+      lastTime = time;
+    }
+  }
+
+  // schedule timeout state after all other commands are executed
+  std::tuple<std::string, unsigned long> timeoutCommand("TIM", lastTime);
+  commandSchedule.push_back(timeoutCommand);
+}
+
+bool goToTimeoutState() {
+  for(size_t i = 0; i < numValves; i++) {
+    digitalWrite(valvePins[i], timeoutState[i]);
+  }
+  return true;
 }
 
 bool inArray(int element, const int *array, size_t arraySize)

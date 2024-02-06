@@ -13,6 +13,10 @@ IPAddress subnet(255, 255, 0, 0); // Should map laptop subnet
 
 // Set to the latest IP address that the Teensy receives a message from
 IPAddress remoteIP(0, 0, 0, 0);
+bool foundLaptop = false;
+bool timedOut = false;
+unsigned long lastPacketTime;
+unsigned long heartbeatTimeout = 2500; 
 
 constexpr uint16_t kPort = 5190; // Chat port
 
@@ -23,5 +27,6 @@ void udpSetup();
 void udpSend(const std::string &message);
 
 void sendSensorValues();
+
 
 #endif
