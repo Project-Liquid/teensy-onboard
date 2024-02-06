@@ -56,7 +56,7 @@ void udpSend(const std::string &message)
 
 void sendSensorValues()
 {
-    std::string message = "";
+    std::string message = "DAT";
     if (sensataStream)
         sensataToString(message);
     if (thermoStream)
