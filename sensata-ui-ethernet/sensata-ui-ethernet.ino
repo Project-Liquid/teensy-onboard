@@ -9,8 +9,8 @@
 std::vector<std::tuple<std::string, unsigned long>> commandSchedule;
 
 // whether or not to transmit sensor data
-bool sensataStream = false;
-bool thermoStream = false;
+bool sensataStream = true;
+bool thermoStream = true;
 
 // TODO: maybe only send sensor values on intervals
 
@@ -35,6 +35,8 @@ void setup()
     {
         // Wait for Serial
     }
+
+    Serial.println("Teensy startup");
 
     udpSetup();
 

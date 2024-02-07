@@ -18,7 +18,7 @@ bool foundLaptop = false;
 // timedOut is, has the Teensy already scheduled the timeout command ?
 bool timedOut = false;
 unsigned long lastPacketTime;
-unsigned long heartbeatTimeout = 2500; 
+unsigned long heartbeatTimeout = 5000; 
 
 constexpr uint16_t kPort = 5190; // Chat port
 
