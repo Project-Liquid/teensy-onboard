@@ -66,8 +66,6 @@ void loop()
     readSensatas();
 
     sendSensorValues();
-
-    //sendValveStates();
 }
 
 void executeScheduledCommands()
@@ -190,6 +188,9 @@ static void receivePacket()
 
     // reset heartbeat variables
     foundLaptop = true;
+    if (timedOut) { // if this is a new connection 
+      sendValveStates();
+    }
     timedOut = false;
     lastPacketTime = millis();
 
@@ -248,7 +249,7 @@ bool pinDigitalWrite(const std::string &data)
         return false;
     }
 
-    std::vector<std::tuple<int, int>> pinStates;
+    std::vector<std::tuple<int, int, int>> pinCommands; // pin, valve, dataVal
 
     for (size_t pos = 0; pos < data.length(); pos += 3)
     {
@@ -267,21 +268,24 @@ bool pinDigitalWrite(const std::string &data)
         }
 
         // Serial.println(pin);
-        if (!inArray(pin, valvePins, numValves))
+        int valve;
+        if (!inArray(pin, valvePins, numValves, valve)) // sets valve if in array
         {
             error("Command includes out-of-bounds pin: " + std::to_string(pin));
             return false;
         }
 
-        std::tuple<int, int> pinState = std::make_tuple(pin, dataVal);
-        pinStates.push_back(pinState);
+        std::tuple<int, int, int> pinCommand = std::make_tuple(pin, valve, dataVal);
+        pinCommands.push_back(pinCommand);
     }
 
-    for (const auto &pinState : pinStates)
+    for (const auto &pinCommand : pinCommands)
     {
-        int pin = std::get<0>(pinState);
-        int dataVal = std::get<1>(pinState);
+        int pin = std::get<0>(pinCommand);
+        int valve = std::get<1>(pinCommand);
+        int dataVal = std::get<2>(pinCommand);
         digitalWrite((uint8_t)pin, dataVal);
+        valveStates[valve] = dataVal;
 
         Serial.print("Set pin ");
         Serial.print((uint8_t)pin);
@@ -301,7 +305,7 @@ bool valveDigitalWrite(const std::string &data)
         return false;
     }
 
-    std::vector<std::tuple<int, int>> pinStates;
+    std::vector<std::tuple<int, int>> valveCommands;
 
     for (size_t pos = 0; pos < dataLength; pos += 2)
     {
@@ -326,18 +330,19 @@ bool valveDigitalWrite(const std::string &data)
             return false;
         }
 
-        std::tuple<int, int> pinState = std::make_tuple(valvePins[valve], dataVal);
-        pinStates.push_back(pinState);
+        std::tuple<int, int> valveCommand = std::make_tuple(valve, dataVal);
+        valveCommands.push_back(valveCommand);
     }
 
-    for (const auto &pinState : pinStates)
+    for (const auto &valveCommand : valveCommands)
     {
-        int pin = std::get<0>(pinState);
-        int dataVal = std::get<1>(pinState);
-        digitalWrite((uint8_t)pin, dataVal);
+        int valve = std::get<0>(valveCommand);
+        int dataVal = std::get<1>(valveCommand);
+        digitalWrite((uint8_t)valvePins[valve], dataVal);
+        valveStates[valve] = dataVal;
 
         Serial.print("Set pin ");
-        Serial.print((uint8_t)pin);
+        Serial.print((uint8_t)valvePins[valve]);
         Serial.print(" to ");
         Serial.println(dataVal);
     }
@@ -375,12 +380,13 @@ bool goToTimeoutState() {
   return true;
 }
 
-bool inArray(int element, const int *array, size_t arraySize)
+bool inArray(int element, const int *array, size_t arraySize, int &valve)
 {
     for (size_t i = 0; i < arraySize; i++)
     {
         if (element == array[i])
         {
+            valve = i;
             return true;
         }
     }
