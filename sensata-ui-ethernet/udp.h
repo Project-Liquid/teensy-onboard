@@ -13,7 +13,9 @@ IPAddress subnet(255, 255, 0, 0); // Should map laptop subnet
 
 // Set to the latest IP address that the Teensy receives a message from
 IPAddress remoteIP(0, 0, 0, 0);
-bool foundLaptop = false;
+// foundLaptop is, has the Teensy received a packet from the laptop since the last time it reconnected?
+bool foundLaptop = false; 
+// timedOut is, has the Teensy already scheduled the timeout command ?
 bool timedOut = false;
 unsigned long lastPacketTime;
 unsigned long heartbeatTimeout = 2500; 

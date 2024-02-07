@@ -26,6 +26,7 @@ int sparkPlugPin = 20;
 const uint8_t numValves = 6;
 int valvePins[numValves] = {0, 1, 2, 17, 16, 15};
 int timeoutState[numValves] = {0, 0, 0, 0, 1, 0};
+int valveStates[numValves] = {0, 0, 0, 0, 0, 0};
 
 void setup()
 {
@@ -65,6 +66,8 @@ void loop()
     readSensatas();
 
     sendSensorValues();
+
+    //sendValveStates();
 }
 
 void executeScheduledCommands()
@@ -184,7 +187,10 @@ static void receivePacket()
     // Get the packet data and set remote address
     const uint8_t *data = udp.data();
     remoteIP = udp.remoteIP();
+
+    // reset heartbeat variables
     foundLaptop = true;
+    timedOut = false;
     lastPacketTime = millis();
 
     // Converting to stringstream
@@ -340,6 +346,7 @@ bool valveDigitalWrite(const std::string &data)
 }
 
 void lostConnectionSequence() {
+  Serial.println("Running lost connection sequence");
   // if no commands, immediately go to timeout state
   if (commandSchedule.empty()) {
     goToTimeoutState();
@@ -361,6 +368,7 @@ void lostConnectionSequence() {
 }
 
 bool goToTimeoutState() {
+  Serial.println("Going to timeout state");
   for(size_t i = 0; i < numValves; i++) {
     digitalWrite(valvePins[i], timeoutState[i]);
   }

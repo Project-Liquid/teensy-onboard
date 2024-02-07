@@ -66,3 +66,12 @@ void sendSensorValues()
     if (sensataStream || thermoStream)
         udpSend(message);
 }
+
+void sendValveStates()
+{
+  std::string message = "VDW";
+  for(size_t i = 0; i < numValves; i++) {
+    message += std::to_string(i) + std::to_string(valveStates[i]);
+  }
+  udpSend(message);
+}
