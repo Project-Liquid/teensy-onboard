@@ -27,6 +27,7 @@ const uint8_t numValves = 6;
 int valvePins[numValves] = {0, 1, 2, 17, 16, 15};
 int timeoutState[numValves] = {0, 0, 0, 0, 1, 0};
 int valveStates[numValves] = {0, 0, 0, 0, 0, 0};
+int sparkPlugState = 0;
 
 void setup()
 {
@@ -57,6 +58,10 @@ void loop()
 
     if(foundLaptop) {
       if((millis() - lastPacketTime > heartbeatTimeout) && !timedOut) {
+        Serial.print("last packet time = ");
+        Serial.println(lastPacketTime);
+        Serial.print("current time = ");
+        Serial.println(millis());
         lostConnectionSequence();
         timedOut = true;
       }
@@ -102,6 +107,7 @@ void parseCommand(std::string command)
     bool success = false;
     if (code == "ECH")
     {
+        //Serial.println("Alive!");
         udpSend(data);
         success = true;
     }
@@ -155,6 +161,9 @@ void parseCommand(std::string command)
         else
         {
             digitalWrite(sparkPlugPin, val);
+            Serial.print("Spark plug to ");
+            Serial.println(val);
+            sparkPlugState = val;
             success = true;
         }
     }
@@ -185,12 +194,15 @@ static void receivePacket()
     }
 
     // Get the packet data and set remote address
+    Serial.print("received packet at time ");
+    Serial.println(millis());
     const uint8_t *data = udp.data();
     remoteIP = udp.remoteIP();
 
     // reset heartbeat variables
     foundLaptop = true;
     if (timedOut) { // if this is a new connection 
+      Serial.println("sending valve states");
       sendValveStates();
     }
     timedOut = false;
@@ -378,7 +390,10 @@ bool goToTimeoutState() {
   Serial.println("Going to timeout state");
   for(size_t i = 0; i < numValves; i++) {
     digitalWrite(valvePins[i], timeoutState[i]);
+    valveStates[i] = timeoutState[i];
   }
+  digitalWrite(sparkPlugPin, 0);
+  sparkPlugState = 0;
   return true;
 }
 
