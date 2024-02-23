@@ -54,6 +54,13 @@ void udpSend(const std::string &message)
     udp.beginPacket(remoteIP, kPort);
     udp.print(message.c_str());
     udp.endPacket();
+    udpCommsData = SD.open(filename, FILE_WRITE);
+    if(udpCommsData) {
+      udpCommsData.print(millis());
+      udpCommsData.print(", ");      
+      udpCommsData.println(message.c_str());
+    }
+    udpCommsData.close();
 }
 
 void sendSensorValues()

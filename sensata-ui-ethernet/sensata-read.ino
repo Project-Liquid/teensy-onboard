@@ -34,8 +34,8 @@ void pcaselect(uint8_t i) {
     Wire.write(1 << i);
     Wire.endTransmission();
     i2cTime = millis() - startTime;
-    Serial.print("pcaselect :");
-    Serial.println(i2cTime);
+    //Serial.print("pcaselect :");
+    //Serial.println(i2cTime);
 }
 
 // Function to convert raw pressure to PSI
@@ -49,10 +49,10 @@ void readSensatas() {
 
         int muxPort = std::get<1>(sensata);
         pcaselect(muxPort);
-        startTime = millis();
+        //startTime = millis();
         int16_t rawPressure = sensataInterface.readDSP_S();
-        Serial.print("read DSP :");
-        Serial.println(millis() - startTime);
+        //Serial.print("read DSP :");
+        //Serial.println(millis() - startTime);
         float psi           = convertToPSI(rawPressure);
         sensataReadings[i]  = psi;
     }

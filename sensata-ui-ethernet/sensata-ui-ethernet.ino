@@ -4,6 +4,7 @@
 #include <vector>
 #include <tuple>
 #include "udp.h"
+#include <SD.h>
 
 // Command name, time of command execution
 std::vector<std::tuple<std::string, unsigned long>> commandSchedule;
@@ -14,6 +15,9 @@ bool thermoStream = true;
 
 unsigned long i2cTime = 0;
 bool borked = false;
+
+File udpCommsData;
+const char filename[] = "udpCommsDataLog.txt";
 
 // TODO: maybe only send sensor values on intervals
 
@@ -55,6 +59,20 @@ void setup()
     pinMode(resetPin, OUTPUT);
 
     digitalWrite(resetPin, HIGH);
+
+    if (!SD.begin(BUILTIN_SDCARD))
+    {
+        error("SD card failed to initalize");
+    } else { 
+      udpCommsData = SD.open(filename, FILE_WRITE);
+      if(udpCommsData) {
+        udpCommsData.println("STARTING NEW LOG");
+        Serial.println("No problems!");
+      } else {
+        error("No udpCommsData file was created :(");
+      }
+      udpCommsData.close();
+    }
 }
 
 void loop()
@@ -219,8 +237,6 @@ static void receivePacket()
     }
 
     // Get the packet data and set remote address
-    Serial.print("received packet at time ");
-    Serial.println(millis());
     const uint8_t *data = udp.data();
     remoteIP = udp.remoteIP();
 
