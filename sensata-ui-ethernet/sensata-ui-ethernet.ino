@@ -12,6 +12,9 @@ std::vector<std::tuple<std::string, unsigned long>> commandSchedule;
 bool sensataStream = true;
 bool thermoStream = true;
 
+unsigned long i2cTime = 0;
+bool borked = false;
+
 // TODO: maybe only send sensor values on intervals
 
 // all normally closed except ethane vent
@@ -28,6 +31,7 @@ int valvePins[numValves] = {0, 1, 2, 17, 16, 15};
 int timeoutState[numValves] = {0, 0, 0, 0, 1, 0};
 int valveStates[numValves] = {0, 0, 0, 0, 0, 0};
 int sparkPlugState = 0;
+int resetPin = 41;
 
 void setup()
 {
@@ -48,6 +52,9 @@ void setup()
     }
     
     pinMode(sparkPlugPin, OUTPUT);
+    pinMode(resetPin, OUTPUT);
+
+    digitalWrite(resetPin, HIGH);
 }
 
 void loop()
@@ -70,9 +77,20 @@ void loop()
     // if it's time to execute any commands , execute them
     executeScheduledCommands();
 
-    readSensatas();
+    if(i2cTime < 10) {
+      if(sensataStream)
+      {
+        readSensatas();
+      }
 
-    sendSensorValues();
+      sendSensorValues();
+    }
+    else {
+      if(!borked) {
+        udpSend("BRK");
+      }
+      borked = true;
+    }
 }
 
 void executeScheduledCommands()
@@ -171,7 +189,14 @@ void parseCommand(std::string command)
     {
       success = goToTimeoutState();
     }
-    else
+    else if (code == "BUD") {
+      Ethernet.begin(teensyIP, subnet, gateway);
+      success = true;
+    }
+    else if (code == "SUD") {
+      Ethernet.end();
+      success = true;
+    } else
     {
         error("Command includes unrecognized command sequence: " + code);
         success = false;

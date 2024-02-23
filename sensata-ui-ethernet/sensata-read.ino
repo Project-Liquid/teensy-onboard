@@ -12,6 +12,8 @@
 
 // Create instances of the pressure sensor
 
+unsigned long startTime;
+
 std::vector<std::tuple<std::string, int>> sensatas = {
     std::make_tuple("P0", 0), std::make_tuple("P1", 1),
     std::make_tuple("P2", 2), std::make_tuple("P3", 3),
@@ -27,9 +29,13 @@ void sensataSetup() {
 
 void pcaselect(uint8_t i) {
     if (i > 7) return;
+    startTime = millis();
     Wire.beginTransmission(PCAADDR);
     Wire.write(1 << i);
     Wire.endTransmission();
+    i2cTime = millis() - startTime;
+    Serial.print("pcaselect :");
+    Serial.println(i2cTime);
 }
 
 // Function to convert raw pressure to PSI
@@ -43,7 +49,10 @@ void readSensatas() {
 
         int muxPort = std::get<1>(sensata);
         pcaselect(muxPort);
+        startTime = millis();
         int16_t rawPressure = sensataInterface.readDSP_S();
+        Serial.print("read DSP :");
+        Serial.println(millis() - startTime);
         float psi           = convertToPSI(rawPressure);
         sensataReadings[i]  = psi;
     }
