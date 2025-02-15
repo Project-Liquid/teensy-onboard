@@ -208,11 +208,11 @@ void parseCommand(std::string command)
       success = goToTimeoutState();
     }
     else if (code == "BUD") {
-      Ethernet.begin(teensyIP, subnet, gateway);
+      // Ethernet.begin(teensyIP, subnet, gateway);
       success = true;
     }
     else if (code == "SUD") {
-      Ethernet.end();
+      // Ethernet.end();
       success = true;
     } else
     {
